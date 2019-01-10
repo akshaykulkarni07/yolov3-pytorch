@@ -97,7 +97,7 @@ def create_modules(blocks):
                 bias = True
                 
             filters = int(x['filters'])
-            padding = int(x['padding'])
+            padding = int(x['pad'])
             kernel_size = int(x['size'])
             stride = int(x['stride'])
             
@@ -158,37 +158,41 @@ def create_modules(blocks):
             shortcut = EmptyLayer()
             module.add_module('shortcut_{}'.format(index), shortcut)
             
-        elif (x['type'] == 'maxpool':
-              stride = int(x['stride'])
-              size = int(x['size'])
-              
-              if stride != 1 :
-                  maxpool = nn.MaxPool2d(size, stride)
-              else :
-                  maxpool = MaxPoolStride1(size)
-              
-              module.add_module('maxpool_{}'.format(index), maxpool)
+        elif (x['type'] == 'maxpool'):
+            stride = int(x['stride'])
+            size = int(x['size'])
+
+            if stride != 1 :
+                maxpool = nn.MaxPool2d(size, stride)
+            else :
+                maxpool = MaxPoolStride1(size)
+
+            module.add_module('maxpool_{}'.format(index), maxpool)
               
           # YOLO (detection layer)
-          elif (x['type'] == 'yolo'):
-              mask = x['mask'].split(',')
-              mask = [int(x) for x in mask]
-              
-              anchors = x['anchors'].split(',')
-              anchors = [int(a) for a in anchors]
-              anchors = [(anchors[i], anchors[i + 1]) for i in range(0, len(anchors), 2)]
-              anchors = [anchors[i] for i in mask]
-              
-              detection = DetectionLayer(anchors)
-              module.add_module('Detection_{}'.format(index), detection)
-              
-          else :
-              print('Something I dont know')
-              assert False
-              
-          module_list.append(module)
-          prev_filters = filters
-          output_filters.append(filters)
-          index += 1
-          
-      return (net_info, module_list)
+        elif (x['type'] == 'yolo'):
+            mask = x['mask'].split(',')
+            mask = [int(x) for x in mask]
+
+            anchors = x['anchors'].split(',')
+            anchors = [int(a) for a in anchors]
+            anchors = [(anchors[i], anchors[i + 1]) for i in range(0, len(anchors), 2)]
+            anchors = [anchors[i] for i in mask]
+
+            detection = DetectionLayer(anchors)
+            module.add_module('Detection_{}'.format(index), detection)
+
+        else :
+            print('Something I dont know')
+            assert False
+
+        module_list.append(module)
+        prev_filters = filters
+        output_filters.append(filters)
+        index += 1
+
+    return (net_info, module_list)
+  
+# For testing parse_cfg and create_modules
+# blocks = parse_cfg('cfg/yolov3.cfg')
+# print(create_modules(blocks))
