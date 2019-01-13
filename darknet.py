@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.nn.functional as F 
 from torch.autograd import Variable
 import numpy as np
+import cv2
+from util import predict_transform
 
 # Parses configuration file to get the network
 def parse_cfg(cfgfile):
@@ -196,3 +198,51 @@ def create_modules(blocks):
 # For testing parse_cfg and create_modules
 # blocks = parse_cfg('cfg/yolov3.cfg')
 # print(create_modules(blocks))
+
+class Darknet(nn.Module):
+    def __init__(self, cfgfile):
+        super(Darknet, self).__init__()
+        self.blocks = parse_cfg(cfgfile)
+        self.net_info, self.module_list = create_modules(self.blocks)
+
+    def forward(self, x, CUDA):
+        modules = self.blocks[1 : ]
+        # cache the outputs for the route layer
+        outputs = {}
+
+        write = 0
+
+        for i in range(len(modules)):
+            module_type = (modules[i]['type'])
+
+            if module_type == 'convolutional' or module_type == 'upsample' or module_type == 'maxpool':
+                x = self.module_list[i](x)
+                outputs[i] = x
+
+            elif module_type == 'route':
+                layers = modules[i]['layers']
+                layers = [int(a) for a in layers]
+
+                if (layers[0] > 0) :
+                    layers[0] -= i
+
+                if len(layers) == 1 :
+                    x = outputs[i + layers[0]]
+                else :
+                    if layers[1] > 0 :
+                        layers[1] -= i
+                    
+                    map1 = outputs[i + layers[0]]
+                    map2 = outputs[i + layers[1]]
+
+                    x = torch.cat((map1, map2), 1)
+                
+                outputs[i] = x
+
+            elif module_type == 'shortcut':
+                from_ = int(module['from'])
+                x = outputs[i - 1] + outputs[i + from_]
+                outputs[i] = x
+
+            elif module_type == 'yolo':
+                anchors = self.module_list[i][0].anchors
